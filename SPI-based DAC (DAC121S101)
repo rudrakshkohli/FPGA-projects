@@ -1,1 +1,148 @@
 
+module dac (
+    input clk,             // System Clock (e.g., 100 MHz)
+    input rst,             // Active High Reset
+    input start,           // Start SPI Transaction
+    input cpol,            // Clock Polarity (0 or 1)
+    input cpha,   
+    input [11:0]data2,         // Clock Phase (0 or 1)
+    output reg cs,         // Chip Select (Active Low)
+    output reg sclk,       // SPI Clock
+    output reg mosi,       // Master Out, Slave In
+    output reg done        // Transaction Done Signal
+);
+
+    // Hardcoded Data for 3.3V (12-bit DAC equivalent)
+    wire [15:0] data_in = {4'b0000 + data2};  // 3.3V equivalent for DAC
+
+    // Generate SPI Clock (1 MHz from 100 MHz System Clock)
+    reg spi_clk;
+    reg [6:0] clk_div;
+    always @(posedge clk or posedge rst) begin
+        if (rst) begin
+            clk_div <= 0;
+            spi_clk <= 0;
+        end else if (clk_div == 49) begin  // Divide by 50 for 1 MHz
+            clk_div <= 0;
+            spi_clk <= ~spi_clk;
+        end else begin
+            clk_div <= clk_div + 1;
+        end
+    end
+
+    // SPI State Machine
+    reg [4:0] bit_index;
+    reg [1:0] state;
+    parameter IDLE = 2'b00, START = 2'b01, TRANSFER = 2'b10, END = 2'b11;
+    reg [15:0] shift_reg;
+
+    always @(posedge spi_clk or posedge rst) begin
+        if (rst) begin
+            state <= IDLE;
+            cs <= 1;
+            shift_reg <= 0;
+            bit_index <= 16;
+            done <= 0;
+        end else begin
+            case (state)
+                IDLE: begin
+                    cs <= 1;
+                    bit_index <= 16;
+                    shift_reg <= data_in;  // **Fixed to 3.3V equivalent**
+                    done <= 0;
+                    if (start) state <= START;
+                end
+
+                START: begin
+                    cs <= 0;  // Enable SPI Slave
+                    state <= TRANSFER;
+                end
+
+                TRANSFER: begin
+                    if (bit_index > 0) begin
+                        if (cpha == 0) begin  // CPHA = 0: Data on SCLK falling, sample on rising
+                            if (sclk == cpol) begin
+                                mosi <= shift_reg[15];  
+                                shift_reg <= shift_reg << 1;
+                                bit_index <= bit_index - 1;
+                            end
+                        end else begin  // CPHA = 1: Data on SCLK rising, sample on falling
+                            if (sclk != cpol) begin
+                                mosi <= shift_reg[15];
+                                shift_reg <= shift_reg << 1;
+                                bit_index <= bit_index - 1;
+                            end
+                        end
+                    end else begin
+                        state <= END;
+                    end
+                end
+
+                END: begin
+                    cs <= 1;
+                    done <= 1;
+                    state <= IDLE;
+                end
+            endcase
+        end
+    end
+
+    // ? Fixed Multi-Driven `sclk` Issue: Toggle `sclk` Only in One Block
+    always @(posedge spi_clk or posedge rst) begin
+        if (rst) 
+            sclk <= cpol;
+        else 
+            sclk <= ~sclk; // Only one assignment
+    end
+
+endmodule
+
+/////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+set_property IOSTANDARD LVCMOS33 [get_ports sclk]
+set_property IOSTANDARD LVCMOS33 [get_ports start]
+set_property IOSTANDARD LVCMOS33 [get_ports cpha]
+set_property IOSTANDARD LVCMOS33 [get_ports cpol]
+set_property IOSTANDARD LVCMOS33 [get_ports cs]
+set_property IOSTANDARD LVCMOS33 [get_ports done]
+set_property IOSTANDARD LVCMOS33 [get_ports mosi]
+set_property IOSTANDARD LVCMOS33 [get_ports rst]
+set_property IOSTANDARD LVCMOS33 [get_ports clk]
+
+set_property IOSTANDARD LVCMOS33 [get_ports scl]
+set_property PACKAGE_PIN B16 [get_ports scl]
+
+set_property IOSTANDARD LVCMOS33 [get_ports {data2[11]}]
+set_property IOSTANDARD LVCMOS33 [get_ports {data2[10]}]
+set_property IOSTANDARD LVCMOS33 [get_ports {data2[9]}]
+set_property IOSTANDARD LVCMOS33 [get_ports {data2[8]}]
+set_property IOSTANDARD LVCMOS33 [get_ports {data2[7]}]
+set_property IOSTANDARD LVCMOS33 [get_ports {data2[6]}]
+set_property IOSTANDARD LVCMOS33 [get_ports {data2[5]}]
+set_property IOSTANDARD LVCMOS33 [get_ports {data2[4]}]
+set_property IOSTANDARD LVCMOS33 [get_ports {data2[3]}]
+set_property IOSTANDARD LVCMOS33 [get_ports {data2[2]}]
+set_property IOSTANDARD LVCMOS33 [get_ports {data2[1]}]
+set_property IOSTANDARD LVCMOS33 [get_ports {data2[0]}]
+set_property PACKAGE_PIN R2 [get_ports {data2[11]}]
+set_property PACKAGE_PIN T1 [get_ports {data2[10]}]
+set_property PACKAGE_PIN W2 [get_ports {data2[8]}]
+set_property PACKAGE_PIN R3 [get_ports {data2[7]}]
+set_property PACKAGE_PIN T2 [get_ports {data2[6]}]
+set_property PACKAGE_PIN T3 [get_ports {data2[5]}]
+set_property PACKAGE_PIN V2 [get_ports {data2[4]}]
+set_property PACKAGE_PIN W13 [get_ports {data2[3]}]
+set_property PACKAGE_PIN W14 [get_ports {data2[2]}]
+set_property PACKAGE_PIN V15 [get_ports {data2[1]}]
+set_property PACKAGE_PIN W15 [get_ports {data2[0]}]
+set_property PACKAGE_PIN U1 [get_ports {data2[9]}]
+set_property PACKAGE_PIN W17 [get_ports start]
+set_property PACKAGE_PIN B16 [get_ports sclk]
+set_property PACKAGE_PIN V17 [get_ports rst]
+set_property PACKAGE_PIN B15 [get_ports mosi]
+set_property PACKAGE_PIN U16 [get_ports done]
+set_property PACKAGE_PIN A14 [get_ports cs]
+set_property PACKAGE_PIN W16 [get_ports cpol]
+set_property PACKAGE_PIN V16 [get_ports cpha]
+set_property PACKAGE_PIN W5 [get_ports clk]
+
