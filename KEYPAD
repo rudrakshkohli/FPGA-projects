@@ -1,1 +1,245 @@
 
+module top_module(
+input clk,
+input reset,
+input [3:0]row,
+output [3:0]col,
+output [6:0] seg,
+output [3:0]an
+ );
+ wire[3:0] debounced_row;
+ wire[3:0]key_value;
+ wire key_pressed;
+ 
+ generate 
+ genvar i;
+ for(i = 0 ; i<4 ; i = i+1 )begin : debounce_rows
+  debounce_model #(
+   .counter_width(20),
+   .stable_time(1000000)
+  )debounce_inst(
+  .clk(clk),
+  .reset(reset),
+  .button(row[i]),
+  .result(debounced_row[i])
+  );
+  end 
+  endgenerate 
+  
+  keypad keypad(
+  .clk(clk),
+  .reset(reset),
+  .col(col),
+  .row(debounced_row),
+  .key_value(key_value),
+  .key_pressed(key_pressed)
+  );
+  
+  ssd ssd (
+  .key_value(key_value),
+  .seg(seg),
+  .an(an)
+  );
+endmodule
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+
+module keypad(
+input clk,
+input reset,
+input [3:0]row,
+output reg[3:0]col,
+output reg [3:0]key_value,
+output reg key_pressed
+    );
+    reg[1:0]current_col;
+    
+    always@(posedge clk or posedge reset)begin 
+    if(reset)begin 
+    col <= 4'b1110;
+    current_col <= 0;
+    end else begin 
+    case(current_col)
+    2'b00: col <= 4'b1110;
+    2'b01: col <= 4'b1101;
+    2'b10 : col <= 4'b1011;
+    2'b11 : col <= 4'b0111;
+    endcase
+    current_col <= current_col + 1;
+    end
+    end
+    
+    always@(posedge clk or posedge reset )begin
+    if(reset)begin 
+    key_value <= 4'b0000;
+    key_pressed <= 1'b0;
+    end else begin 
+    key_pressed <= 1'b0;
+    case ({col , row})
+    8'b1110_1110 : begin key_value <= 4'b0001; key_pressed <= 1'b1;end
+    8'b1110_1101 : begin key_value <= 4'b0010; key_pressed <= 1'b1;end 
+    8'b1110_1011 : begin key_value <= 4'b0011; key_pressed <= 1'b1;end 
+    8'b1110_0111 : begin key_value <= 4'b1010; key_pressed <= 1'b1;end
+    
+    8'b1101_1110 : begin key_value <= 4'b0100; key_pressed <= 1'b1;end
+    8'b1101_1101 : begin key_value <= 4'b0101; key_pressed <= 1'b1;end 
+    8'b1101_1011 : begin key_value <= 4'b0110; key_pressed <= 1'b1;end 
+    8'b1101_0111 : begin key_value <= 4'b1011; key_pressed <= 1'b1;end 
+    
+    8'b1011_1110 : begin key_value <= 4'b0111; key_pressed <= 1'b1;end
+    8'b1011_1101 : begin key_value <= 4'b1000; key_pressed <= 1'b1;end 
+    8'b1011_1011 : begin key_value <= 4'b1001; key_pressed <= 1'b1;end 
+    8'b1011_0111 : begin key_value <= 4'b1100; key_pressed <= 1'b1;end 
+    
+    8'b0111_1110 : begin key_value <= 4'b0000; key_pressed <= 1'b1;end
+    8'b0111_1101 : begin key_value <= 4'b1111; key_pressed <= 1'b1;end 
+    8'b0111_1011 : begin key_value <= 4'b1110; key_pressed <= 1'b1;end 
+    8'b0111_0111 : begin key_value <= 4'b1101; key_pressed <= 1'b1;end 
+    
+    default : key_pressed <= 1'b0;
+    endcase
+    end
+     end
+endmodule
+
+/////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+
+
+module ssd(
+    input [3:0] key_value, // Key value from the keypad
+    output reg [6:0] seg,  // Seven-segment segments (a-g)
+    output [3:0] an        // Seven-segment digit enable signals
+);
+
+    assign an = 4'b1110;  // Enable only the first digit (Digit 0)
+
+    always @(key_value) begin
+        case (key_value)
+            4'b0000: seg = 7'b1000000; // 0
+            4'b0001: seg = 7'b1111001; // 1
+            4'b0010: seg = 7'b0100100; // 2
+            4'b0011: seg = 7'b0110000; // 3
+            4'b0100: seg = 7'b0011001; // 4
+            4'b0101: seg = 7'b0010010; // 5
+            4'b0110: seg = 7'b0000010; // 6
+            4'b0111: seg = 7'b1111000; // 7
+            4'b1000: seg = 7'b0000000; // 8
+            4'b1001: seg = 7'b0010000; // 9
+            4'b1010: seg = 7'b0001000; // A
+            4'b1011: seg = 7'b0000011; // B
+            4'b1100: seg = 7'b1000110; // C
+            4'b1101: seg = 7'b0100001; // D
+            4'b1110: seg = 7'b0000110; // E
+            4'b1111: seg = 7'b0001110; // F
+            default: seg = 7'b1111111; // Blank
+        endcase
+    end
+
+endmodule
+
+/////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+module debounce_model(
+input clk ,
+input reset,
+input wire button,
+output wire result
+);
+parameter counter_width = 20;
+parameter stable_time = 100000;
+
+reg ff1 , ff2 , ff3;
+wire xor_out;
+reg[counter_width -1 : 0]counter;
+wire counter_ena;
+always@(posedge clk or posedge reset)begin   // ff1 capture
+if(reset)begin 
+ff1 <= 1'b0;
+end
+else begin
+ff1 <= button;
+ end
+ end
+always@(posedge clk or posedge reset)begin  // captuire ff2
+if(reset)begin 
+ff2 <= 1'b0;
+end
+else begin 
+ff2 <= ff1;
+end
+end
+
+assign xor_out  = ff1^ff2;
+
+always@(posedge clk or posedge reset)begin 
+if(reset)begin 
+counter <= 1'b0;
+end
+else if(xor_out)begin 
+counter <= 0;
+end
+else if (counter<stable_time)begin 
+counter <= counter + 1;
+end
+
+end
+assign counter_ena = (counter == stable_time);
+always@(posedge clk or posedge reset)begin 
+if(reset)begin
+ff3<= 1'b0;
+ end
+ else if (counter_ena) begin
+ ff3<= ff2;
+ end
+end
+assign result = ff3;
+endmodule
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+
+set_property IOSTANDARD LVCMOS33 [get_ports {an[3]}]
+set_property IOSTANDARD LVCMOS33 [get_ports {an[2]}]
+set_property IOSTANDARD LVCMOS33 [get_ports {an[1]}]
+set_property IOSTANDARD LVCMOS33 [get_ports {an[0]}]
+set_property IOSTANDARD LVCMOS33 [get_ports {col[3]}]
+set_property IOSTANDARD LVCMOS33 [get_ports {col[2]}]
+set_property IOSTANDARD LVCMOS33 [get_ports {col[1]}]
+set_property IOSTANDARD LVCMOS33 [get_ports {col[0]}]
+set_property IOSTANDARD LVCMOS33 [get_ports {row[3]}]
+set_property IOSTANDARD LVCMOS33 [get_ports {row[2]}]
+set_property IOSTANDARD LVCMOS33 [get_ports {row[1]}]
+set_property IOSTANDARD LVCMOS33 [get_ports {row[0]}]
+set_property IOSTANDARD LVCMOS33 [get_ports {seg[6]}]
+set_property IOSTANDARD LVCMOS33 [get_ports {seg[5]}]
+set_property IOSTANDARD LVCMOS33 [get_ports {seg[4]}]
+set_property IOSTANDARD LVCMOS33 [get_ports {seg[3]}]
+set_property IOSTANDARD LVCMOS33 [get_ports {seg[2]}]
+set_property IOSTANDARD LVCMOS33 [get_ports {seg[1]}]
+set_property IOSTANDARD LVCMOS33 [get_ports {seg[0]}]
+set_property PACKAGE_PIN U2 [get_ports {an[0]}]
+set_property PACKAGE_PIN U4 [get_ports {an[1]}]
+set_property PACKAGE_PIN V4 [get_ports {an[2]}]
+set_property PACKAGE_PIN W4 [get_ports {an[3]}]
+set_property PACKAGE_PIN W7 [get_ports {seg[0]}]
+set_property PACKAGE_PIN W6 [get_ports {seg[1]}]
+set_property PACKAGE_PIN U8 [get_ports {seg[2]}]
+set_property PACKAGE_PIN V8 [get_ports {seg[3]}]
+set_property PACKAGE_PIN U5 [get_ports {seg[4]}]
+set_property PACKAGE_PIN V5 [get_ports {seg[5]}]
+set_property PACKAGE_PIN U7 [get_ports {seg[6]}]
+set_property PACKAGE_PIN A14 [get_ports {col[0]}]
+set_property PACKAGE_PIN A16 [get_ports {col[1]}]
+set_property PACKAGE_PIN B15 [get_ports {col[2]}]
+set_property PACKAGE_PIN B16 [get_ports {col[3]}]
+set_property PACKAGE_PIN A15 [get_ports {row[0]}]
+set_property PACKAGE_PIN A17 [get_ports {row[1]}]
+set_property PACKAGE_PIN C15 [get_ports {row[2]}]
+set_property PACKAGE_PIN C16 [get_ports {row[3]}]
+set_property PACKAGE_PIN W5 [get_ports clk]
+set_property PACKAGE_PIN V17 [get_ports reset]
+set_property IOSTANDARD LVCMOS33 [get_ports clk]
+set_property IOSTANDARD LVCMOS33 [get_ports reset]
+
+
+
