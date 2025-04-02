@@ -1,1 +1,166 @@
 
+
+/* FreeRTOS includes. */
+#include "FreeRTOS.h"
+#include "task.h"
+#include "queue.h"
+#include "timers.h"
+/* Xilinx includes. */
+#include "xil_printf.h"
+#include "xparameters.h"
+#include "xiicps.h";
+//XIICPS i2c;
+//XIicPs_i2c *i2c_Config;
+//
+//void i2c_init()
+//{
+//	XIicPs_Config *XIicPs_LookupConfig(XPAR_PS7_I2C_0_DEVICE_ID);
+//	XIicPs_CfgInitialize(&i2c, i2c_Config,
+//			XPAR_PS7_I2C_0_BASEADDR);
+//	XIicPs_SetOptions(&i2c, XIICPS_7_BIT_ADDR_OPTION);
+//	XIicPs_SetSClk(&i2c, 0x186A0); //100khz
+//
+//}
+
+#define OLED_ADDR 0x3C
+#define COMMAND_MODE 0x00
+#define DATA_MODE 0x40
+#define IIC_DEVICE_ID XPAR_XIICPS_0_DEVICE_ID
+XIicPs IicPs;
+int I2C_Send(u8 *Data, int Length) {
+return XIicPs_MasterSendPolled(&IicPs, Data, Length, OLED_ADDR);
+}
+void sendCommand(u8 command) {
+u8 cmd[2] = {COMMAND_MODE, command};
+I2C_Send(cmd, 2);
+}
+void sendData(u8 data) {
+u8 d[2] = {DATA_MODE, data};
+I2C_Send(d, 2);
+}
+void initOLED() {
+sendCommand(0xAE); // Display OFF
+sendCommand(0xAF); // Display ON
+sendCommand(0xAE); // Display OFF
+sendCommand(0xD5); // Set display clock divide ratio/oscillator frequency
+sendCommand(0x80);
+sendCommand(0xA8);
+sendCommand(0x3F);
+sendCommand(0xD3);
+sendCommand(0x00);
+sendCommand(0x40);
+sendCommand(0x8D);
+sendCommand(0x14);
+sendCommand(0x20);
+sendCommand(0x00);
+sendCommand(0xA1);
+sendCommand(0xC8);
+sendCommand(0xDA);
+
+sendCommand(0x12);
+sendCommand(0x81);
+sendCommand(0x7F);
+sendCommand(0xD9);
+sendCommand(0xF1);
+sendCommand(0xDB);
+sendCommand(0x40);
+sendCommand(0xA4);
+sendCommand(0xA6);
+sendCommand(0xAF); // Display ON
+}
+void clearDisplay() {
+for (u8 page = 0; page < 8; page++) {
+sendCommand(0xB0 + page);
+sendCommand(0x00);
+sendCommand(0x10);
+for (u8 col = 0; col < 128; col++) {
+sendData(0x00);
+}
+}
+
+}
+void drawCharacter(u8 x, u8 page, char c) {
+static const u8 font[26][5] = {
+// Font data for 'A' to 'Z'
+{0x7E, 0x09, 0x09, 0x09, 0x7E}, // A
+{0x7F, 0x49, 0x49, 0x49, 0x36}, // B
+{0x3E, 0x41, 0x41, 0x41, 0x22}, // C
+{0x7F, 0x41, 0x41, 0x41, 0x3E}, // D
+{0x7F, 0x49, 0x49, 0x49, 0x41}, // E
+{0x7F, 0x09, 0x09, 0x09, 0x01}, // F
+{0x3E, 0x41, 0x49, 0x49, 0x2E}, // G
+{0x7F, 0x08, 0x08, 0x08, 0x7F}, // H
+{0x41, 0x7F, 0x41, 0x00, 0x00}, // I
+{0x20, 0x40, 0x40, 0x3F, 0x00}, // J
+{0x7F, 0x08, 0x14, 0x22, 0x41}, // K
+{0x7F, 0x40, 0x40, 0x40, 0x40}, // L
+{0x7F, 0x02, 0x04, 0x02, 0x7F}, // M
+{0x7F, 0x02, 0x04, 0x08, 0x7F}, // N
+{0x3E, 0x41, 0x41, 0x41, 0x3E}, // O
+{0x7F, 0x09, 0x09, 0x09, 0x06}, // P
+{0x3E, 0x41, 0x51, 0x21, 0x5E}, // Q
+{0x7F, 0x09, 0x19, 0x29, 0x46}, // R
+{0x46, 0x49, 0x49, 0x49, 0x31}, // S
+{0x01, 0x01, 0x7F, 0x01, 0x01}, // T
+{0x3F, 0x40, 0x40, 0x40, 0x3F}, // U
+{0x1F, 0x20, 0x40, 0x20, 0x1F}, // V
+
+{0x7F, 0x20, 0x10, 0x20, 0x7F}, // W
+{0x63, 0x14, 0x08, 0x14, 0x63}, // X
+{0x07, 0x08, 0x70, 0x08, 0x07}, // Y
+{0x61, 0x51, 0x49, 0x45, 0x43} // Z
+};
+if (c >= 'A' && c <= 'Z') {
+u8 index = c - 'A';
+sendCommand(0xB0 + page);
+sendCommand(0x00 + (x & 0x0F));
+sendCommand(0x10 + (x >> 4));
+for (u8 i = 0; i < 5; i++) {
+sendData(font[index][i]);
+}
+sendData(0x00);
+}
+}
+void displayMessage() {
+const char *message = "HELLO XIICPS";
+u8 x = 2;
+u8 page = 0;
+for (u8 i = 0; message[i] != '\0'; i++) {
+if (message[i] == ' ') {
+x += 6;
+} else {
+drawCharacter(x, page, message[i]);
+x += 6;
+}
+if (x >= 128) {
+x = 0;
+page++;
+}
+}
+}
+int main() {
+XIicPs_Config *ConfigPtr;
+int Status;
+ConfigPtr = XIicPs_LookupConfig(IIC_DEVICE_ID);
+if (!ConfigPtr) {
+xil_printf("I2C configuration lookup failed\n");
+return XST_FAILURE;
+}
+Status = XIicPs_CfgInitialize(&IicPs, ConfigPtr, ConfigPtr->BaseAddress);
+
+if (Status != XST_SUCCESS) {
+xil_printf("I2C initialization failed\n");
+return XST_FAILURE;
+}
+Status = XIicPs_SetSClk(&IicPs, 100000); // Set I2C clock to 100kHz
+if (Status != XST_SUCCESS) {
+xil_printf("Failed to set I2C clock\n");
+return XST_FAILURE;
+}
+XIicPs_SetOptions(&IicPs, XIICPS_7_BIT_ADDR_OPTION);
+initOLED();
+clearDisplay();
+displayMessage();
+return 0;
+}
+
