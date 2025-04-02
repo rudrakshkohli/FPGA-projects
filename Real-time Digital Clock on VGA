@@ -1,1 +1,733 @@
+module top(
+    input clk_100MHz,       // 100MHz on Basys 3
+    input reset,            // btnC
+    input tick_hr,          // btnL
+    input tick_min,         // btnR
+    output hsync,           // to VGA Connector
+    output vsync,           // to VGA Connector
+    output [11:0] rgb       // to DAC, to VGA Connector
+    );
+    
+    // Internal Connection Signals
+    wire [9:0] w_x, w_y;
+    wire video_on, p_tick;
+    wire [3:0] hr_10s, hr_1s, min_10s, min_1s, sec_10s, sec_1s;
+    reg [11:0] rgb_reg;
+    wire [11:0] rgb_next;
+    
+    // Instantiate Modules
+    vga_controller vga(
+        .clk_100MHz(clk_100MHz),
+        .reset(reset),
+        .video_on(video_on),
+        .hsync(hsync),
+        .vsync(vsync),
+        .p_tick(p_tick),
+        .x(w_x),
+        .y(w_y)
+        );
+ 
+    new_binary_clock bin(
+        .clk_100MHz(clk_100MHz),
+        .reset(reset),
+        .tick_hr(tick_hr),
+        .tick_min(tick_min),
+        .tick_1Hz(),        // not used
+        .sec_1s(sec_1s),
+        .sec_10s(sec_10s),
+        .min_1s(min_1s),
+        .min_10s(min_10s),
+        .hr_1s(hr_1s),
+        .hr_10s(hr_10s)
+        );
 
+    pixel_clk_gen pclk(
+        .clk(clk_100MHz),
+        .video_on(video_on),
+        //.tick_1Hz(),
+        .x(w_x),
+        .y(w_y),
+        .sec_1s(sec_1s),
+        .sec_10s(sec_10s),
+        .min_1s(min_1s),
+        .min_10s(min_10s),
+        .hr_1s(hr_1s),
+        .hr_10s(hr_10s),
+        .time_rgb(rgb_next)
+        );
+ 
+    // rgb buffer
+    always @(posedge clk_100MHz)
+        if(p_tick)
+            rgb_reg <= rgb_next;
+            
+    // output
+    assign rgb = rgb_reg; 
+    
+endmodule
+////////////////////////////////////////////////////////////////////////////////////////
+
+module clock_digit_rom(
+	input clk, 
+	input wire [10:0] addr,
+	output reg [7:0] data
+	);
+
+	(* rom_style = "block" *)	// Infer BRAM
+
+	reg [10:0] addr_reg;
+	
+	always @(posedge clk)
+		addr_reg <= addr;
+		
+	always @*
+		case(addr_reg)
+			// code x30 (0)
+			11'h300: data = 8'b00000000;	//
+			11'h301: data = 8'b00000000;	//
+			11'h302: data = 8'b00111000;	//  ***  
+			11'h303: data = 8'b01101100;	// ** **
+			11'h304: data = 8'b11000110;	//**   **
+			11'h305: data = 8'b11000110;	//**   **
+			11'h306: data = 8'b11000110;	//**   **
+			11'h307: data = 8'b11000110;	//**   **
+			11'h308: data = 8'b11000110;	//**   **
+			11'h309: data = 8'b11000110;	//**   **
+			11'h30a: data = 8'b01101100;	// ** **
+			11'h30b: data = 8'b00111000;	//  ***
+			11'h30c: data = 8'b00000000;	//
+			11'h30d: data = 8'b00000000;	//
+			11'h30e: data = 8'b00000000;	//
+			11'h30f: data = 8'b00000000;	//
+			// code x31 (1)
+			11'h310: data = 8'b00000000;	//
+			11'h311: data = 8'b00000000;	//
+			11'h312: data = 8'b00011000;	//   **  
+			11'h313: data = 8'b00111000;	//  ***
+			11'h314: data = 8'b01111000;	// ****
+			11'h315: data = 8'b00011000;	//   **
+			11'h316: data = 8'b00011000;	//   **
+			11'h317: data = 8'b00011000;	//   **
+			11'h318: data = 8'b00011000;	//   **
+			11'h319: data = 8'b00011000;	//   **
+			11'h31a: data = 8'b01111110;	// ******
+			11'h31b: data = 8'b01111110;	// ******
+			11'h31c: data = 8'b00000000;	//
+			11'h31d: data = 8'b00000000;	//
+			11'h31e: data = 8'b00000000;	//
+			11'h31f: data = 8'b00000000;	//
+			// code x32 (2)
+			11'h320: data = 8'b00000000;	//
+			11'h321: data = 8'b00000000;	//
+			11'h322: data = 8'b11111110;	//*******  
+			11'h323: data = 8'b11111110;	//*******
+			11'h324: data = 8'b00000110;	//     **
+			11'h325: data = 8'b00000110;	//     **
+			11'h326: data = 8'b11111110;	//*******
+			11'h327: data = 8'b11111110;	//*******
+			11'h328: data = 8'b11000000;	//**
+			11'h329: data = 8'b11000000;	//**
+			11'h32a: data = 8'b11111110;	//*******
+			11'h32b: data = 8'b11111110;	//*******
+			11'h32c: data = 8'b00000000;	//
+			11'h32d: data = 8'b00000000;	//
+			11'h32e: data = 8'b00000000;	//
+			11'h32f: data = 8'b00000000;	//
+			// code x33 (3)
+			11'h330: data = 8'b00000000;	//
+			11'h331: data = 8'b00000000;	//
+			11'h332: data = 8'b11111110;	//*******  
+			11'h333: data = 8'b11111110;	//*******
+			11'h334: data = 8'b00000110;	//     **
+			11'h335: data = 8'b00000110;	//     **
+			11'h336: data = 8'b00111110;	//  *****
+			11'h337: data = 8'b00111110;	//  *****
+			11'h338: data = 8'b00000110;	//     **
+			11'h339: data = 8'b00000110;	//     **
+			11'h33a: data = 8'b11111110;	//*******
+			11'h33b: data = 8'b11111110;	//*******
+			11'h33c: data = 8'b00000000;	//
+			11'h33d: data = 8'b00000000;	//
+			11'h33e: data = 8'b00000000;	//
+			11'h33f: data = 8'b00000000;	//
+			// code x34 (4)
+			11'h340: data = 8'b00000000;	//
+			11'h341: data = 8'b00000000;	//
+			11'h342: data = 8'b11000110;	//**   **  
+			11'h343: data = 8'b11000110;	//**   **
+			11'h344: data = 8'b11000110;	//**   **
+			11'h345: data = 8'b11000110;	//**   **
+			11'h346: data = 8'b11111110;	//*******
+			11'h347: data = 8'b11111110;	//*******
+			11'h348: data = 8'b00000110;	//     **
+			11'h349: data = 8'b00000110;	//     **
+			11'h34a: data = 8'b00000110;	//     **
+			11'h34b: data = 8'b00000110;	//     **
+			11'h34c: data = 8'b00000000;	//
+			11'h34d: data = 8'b00000000;	//
+			11'h34e: data = 8'b00000000;	//
+			11'h34f: data = 8'b00000000;	//
+			// code x35 (5)
+			11'h350: data = 8'b00000000;	//
+			11'h351: data = 8'b00000000;	//
+			11'h352: data = 8'b11111110;	//*******  
+			11'h353: data = 8'b11111110;	//*******
+			11'h354: data = 8'b11000000;	//**
+			11'h355: data = 8'b11000000;	//**
+			11'h356: data = 8'b11111110;	//*******
+			11'h357: data = 8'b11111110;	//*******
+			11'h358: data = 8'b00000110;	//     **
+			11'h359: data = 8'b00000110;	//     **
+			11'h35a: data = 8'b11111110;	//*******
+			11'h35b: data = 8'b11111110;	//*******
+			11'h35c: data = 8'b00000000;	//
+			11'h35d: data = 8'b00000000;	//
+			11'h35e: data = 8'b00000000;	//
+			11'h35f: data = 8'b00000000;	//
+			// code x36 (6)
+			11'h360: data = 8'b00000000;	//
+			11'h361: data = 8'b00000000;	//
+			11'h362: data = 8'b11111110;	//*******  
+			11'h363: data = 8'b11111110;	//*******
+			11'h364: data = 8'b11000000;	//**
+			11'h365: data = 8'b11000000;	//**
+			11'h366: data = 8'b11111110;	//*******
+			11'h367: data = 8'b11111110;	//*******
+			11'h368: data = 8'b11000110;	//**   **
+			11'h369: data = 8'b11000110;	//**   **
+			11'h36a: data = 8'b11111110;	//*******
+			11'h36b: data = 8'b11111110;	//*******
+			11'h36c: data = 8'b00000000;	//
+			11'h36d: data = 8'b00000000;	//
+			11'h36e: data = 8'b00000000;	//
+			11'h36f: data = 8'b00000000;	//
+			// code x37 (7)
+			11'h370: data = 8'b00000000;	//
+			11'h371: data = 8'b00000000;	//
+			11'h372: data = 8'b11111110;	//*******  
+			11'h373: data = 8'b11111110;	//*******
+			11'h374: data = 8'b00000110;	//     **
+			11'h375: data = 8'b00000110;	//     **
+			11'h376: data = 8'b00000110;	//     **
+			11'h377: data = 8'b00000110;	//     **
+			11'h378: data = 8'b00000110;	//     **
+			11'h379: data = 8'b00000110;	//     **
+			11'h37a: data = 8'b00000110;	//     **
+			11'h37b: data = 8'b00000110;	//     **
+			11'h37c: data = 8'b00000000;	//
+			11'h37d: data = 8'b00000000;	//
+			11'h37e: data = 8'b00000000;	//
+			11'h37f: data = 8'b00000000;	//
+			// code x38 (8)
+			11'h380: data = 8'b00000000;	//
+			11'h381: data = 8'b00000000;	//
+			11'h382: data = 8'b11111110;	//*******  
+			11'h383: data = 8'b11111110;	//*******
+			11'h384: data = 8'b11000110;	//**   **
+			11'h385: data = 8'b11000110;	//**   **
+			11'h386: data = 8'b11111110;	//*******
+			11'h387: data = 8'b11111110;	//*******
+			11'h388: data = 8'b11000110;	//**   **
+			11'h389: data = 8'b11000110;	//**   **
+			11'h38a: data = 8'b11111110;	//*******
+			11'h38b: data = 8'b11111110;	//*******
+			11'h38c: data = 8'b00000000;	//
+			11'h38d: data = 8'b00000000;	//
+			11'h38e: data = 8'b00000000;	//
+			11'h38f: data = 8'b00000000;	//
+			// code x39 (9)
+			11'h390: data = 8'b00000000;	//
+			11'h391: data = 8'b00000000;	//
+			11'h392: data = 8'b11111110;	//*******  
+			11'h393: data = 8'b11111110;	//*******
+			11'h394: data = 8'b11000110;	//**   **
+			11'h395: data = 8'b11000110;	//**   **
+			11'h396: data = 8'b11111110;	//*******
+			11'h397: data = 8'b11111110;	//*******
+			11'h398: data = 8'b00000110;	//     **
+			11'h399: data = 8'b00000110;	//     **
+			11'h39a: data = 8'b11111110;	//*******
+			11'h39b: data = 8'b11111110;	//*******
+			11'h39c: data = 8'b00000000;	//
+			11'h39d: data = 8'b00000000;	//
+			11'h39e: data = 8'b00000000;	//
+			11'h39f: data = 8'b00000000;	//
+    		// code x3a (:)
+			11'h3a0: data = 8'b00000000;	//
+			11'h3a1: data = 8'b00000000;	//
+			11'h3a2: data = 8'b00000000;	//
+			11'h3a3: data = 8'b00000000;	//
+			11'h3a4: data = 8'b00011000;	//   **
+			11'h3a5: data = 8'b00011000;	//   **
+			11'h3a6: data = 8'b00000000;	//
+			11'h3a7: data = 8'b00000000;	//
+			11'h3a8: data = 8'b00011000;	//   **
+			11'h3a9: data = 8'b00011000;	//   **
+			11'h3aa: data = 8'b00000000;	//   
+			11'h3ab: data = 8'b00000000;	//   
+			11'h3ac: data = 8'b00000000;	//
+			11'h3ad: data = 8'b00000000;	//
+			11'h3ae: data = 8'b00000000;	//
+			11'h3af: data = 8'b00000000;	//
+		endcase
+	
+endmodule
+/////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+
+
+module new_binary_clock(
+    input clk_100MHz,                   // sys clock
+    input reset,                        // reset clock
+    input tick_hr,                      // to increment hours
+    input tick_min,                     // to increment minutes
+    output tick_1Hz,                    // 1Hz output signal
+    output [3:0] sec_1s, sec_10s,       // BCD outputs for seconds
+    output [3:0] min_1s, min_10s,       // BCD outputs for minutes
+    output [3:0] hr_1s, hr_10s          // BCD outputs for hours
+    );
+    
+	// signals for button debouncing
+	reg a, b, c, d, e, f;
+	wire db_hr, db_min;
+	
+	// debounce tick hour button input
+	always @(posedge clk_100MHz) begin
+		a <= tick_hr;
+		b <= a;
+		c <= b;
+	end
+	assign db_hr = c;
+	
+	// debounce tick minute button input
+	always @(posedge clk_100MHz) begin
+		d <= tick_min;
+		e <= d;
+		f <= e;
+	end
+	assign db_min = f;
+	
+    // ********************************************************
+    // create the 1Hz signal
+    reg [31:0] ctr_1Hz = 32'h0;
+    reg r_1Hz = 1'b0;
+    
+    always @(posedge clk_100MHz or posedge reset)
+        if(reset)
+            ctr_1Hz <= 32'h0;
+        else
+            if(ctr_1Hz == 49_999_999) begin
+                ctr_1Hz <= 32'h0;
+                r_1Hz <= ~r_1Hz;
+            end
+            else
+                ctr_1Hz <= ctr_1Hz + 1;
+     
+    // ********************************************************
+    // regs for each time value
+    reg [5:0] seconds_ctr = 6'b0;   // 0
+    reg [5:0] minutes_ctr = 6'b0;   // 0
+    reg [3:0] hours_ctr = 4'hc;     // 12
+	
+	// seconds counter reg control
+    always @(posedge tick_1Hz or posedge reset)
+        if(reset)
+            seconds_ctr <= 6'b0;
+        else
+            if(seconds_ctr == 59)
+                seconds_ctr <= 6'b0;
+            else
+                seconds_ctr <= seconds_ctr + 1;
+            
+    // minutes counter reg control       
+    always @(posedge tick_1Hz or posedge reset)
+        if(reset)
+            minutes_ctr <= 6'b0;
+        else 
+            if(db_min | (seconds_ctr == 59))
+                if(minutes_ctr == 59)
+                    minutes_ctr <= 6'b0;
+                else
+                    minutes_ctr <= minutes_ctr + 1;
+                    
+    // hours counter reg control
+    always @(posedge tick_1Hz or posedge reset)
+        if(reset)
+            hours_ctr <= 4'hc;  // 12
+        else 
+            if(db_hr | (minutes_ctr == 59 && seconds_ctr == 59))
+                if(hours_ctr == 12)
+                    hours_ctr <= 4'h1;
+                else
+                    hours_ctr <= hours_ctr + 1;
+                    
+    // ********************************************************                
+    // convert binary values to output bcd values
+    assign sec_10s = seconds_ctr / 10;
+    assign sec_1s  = seconds_ctr % 10;
+    assign min_10s = minutes_ctr / 10;
+    assign min_1s  = minutes_ctr % 10;
+    assign hr_10s  = hours_ctr   / 10;
+    assign hr_1s   = hours_ctr   % 10;     
+     
+    // 1Hz output            
+    assign tick_1Hz = r_1Hz; 
+            
+endmodule
+
+/////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+
+module pixel_clk_gen(
+    input clk,
+    input video_on,
+    //input tick_1Hz,       // use signal if blinking colon(s) is desired
+    input [9:0] x, y,
+    input [3:0] sec_1s, sec_10s,
+    input [3:0] min_1s, min_10s,
+    input [3:0] hr_1s, hr_10s,
+    output reg [11:0] time_rgb
+    );
+  
+    // *** Constant Declarations ***
+    // Hour 10s Digit section = 32 x 64
+    localparam H10_X_L = 192;
+    localparam H10_X_R = 223;
+    localparam H10_Y_T = 192;
+    localparam H10_Y_B = 256;
+    
+    // Hour 1s Digit section = 32 x 64
+    localparam H1_X_L = 224;
+    localparam H1_X_R = 255;
+    localparam H1_Y_T = 192;
+    localparam H1_Y_B = 256;
+    
+    // Colon 1 section = 32 x 64
+    localparam C1_X_L = 256;
+    localparam C1_X_R = 287;
+    localparam C1_Y_T = 192;
+    localparam C1_Y_B = 256;
+    
+    // Minute 10s Digit section = 32 x 64
+    localparam M10_X_L = 288;
+    localparam M10_X_R = 319;
+    localparam M10_Y_T = 192;
+    localparam M10_Y_B = 256;
+    
+    // Minute 1s Digit section = 32 x 64
+    localparam M1_X_L = 320;
+    localparam M1_X_R = 351;
+    localparam M1_Y_T = 192;
+    localparam M1_Y_B = 256;
+    
+    // Colon 2 section = 32 x 64
+    localparam C2_X_L = 352;
+    localparam C2_X_R = 383;
+    localparam C2_Y_T = 192;
+    localparam C2_Y_B = 256;
+    
+    // Second 10s Digit section = 32 x 64
+    localparam S10_X_L = 384;
+    localparam S10_X_R = 415;
+    localparam S10_Y_T = 192;
+    localparam S10_Y_B = 256;
+    
+    // Second 1s Digit section = 32 x 64
+    localparam S1_X_L = 416;
+    localparam S1_X_R = 447;
+    localparam S1_Y_T = 192;
+    localparam S1_Y_B = 256;
+    
+    // Object Status Signals
+    wire H10_on, H1_on, C1_on, M10_on, M1_on, C2_on, S10_on, S1_on;
+    
+    // ROM Interface Signals
+    wire [10:0] rom_addr;
+    reg [6:0] char_addr;   // 3'b011 + BCD value of time component
+    wire [6:0] char_addr_h10, char_addr_h1, char_addr_m10, char_addr_m1, char_addr_s10, char_addr_s1, char_addr_c1, char_addr_c2;
+    reg [3:0] row_addr;    // row address of digit
+    wire [3:0] row_addr_h10, row_addr_h1, row_addr_m10, row_addr_m1, row_addr_s10, row_addr_s1, row_addr_c1, row_addr_c2;
+    reg [2:0] bit_addr;    // column address of rom data
+    wire [2:0] bit_addr_h10, bit_addr_h1, bit_addr_m10, bit_addr_m1, bit_addr_s10, bit_addr_s1, bit_addr_c1, bit_addr_c2;
+    wire [7:0] digit_word;  // data from rom
+    wire digit_bit;
+    
+    
+    assign char_addr_h10 = {3'b011, hr_10s};
+    assign row_addr_h10 = y[5:2];   // scaling to 32x64
+    assign bit_addr_h10 = x[4:2];   // scaling to 32x64
+    
+    assign char_addr_h1 = {3'b011, hr_1s};
+    assign row_addr_h1 = y[5:2];   // scaling to 32x64
+    assign bit_addr_h1 = x[4:2];   // scaling to 32x64
+    
+    assign char_addr_c1 = 7'h3a;
+    assign row_addr_c1 = y[5:2];    // scaling to 32x64
+    assign bit_addr_c1 = x[4:2];    // scaling to 32x64
+    
+    assign char_addr_m10 = {3'b011, min_10s};
+    assign row_addr_m10 = y[5:2];   // scaling to 32x64
+    assign bit_addr_m10 = x[4:2];   // scaling to 32x64
+    
+    assign char_addr_m1 = {3'b011, min_1s};
+    assign row_addr_m1 = y[5:2];   // scaling to 32x64
+    assign bit_addr_m1 = x[4:2];   // scaling to 32x64
+    
+    assign char_addr_c2 = 7'h3a;
+    assign row_addr_c2 = y[5:2];    // scaling to 32x64
+    assign bit_addr_c2 = x[4:2];    // scaling to 32x64
+    
+    assign char_addr_s10 = {3'b011, sec_10s};
+    assign row_addr_s10 = y[5:2];   // scaling to 32x64
+    assign bit_addr_s10 = x[4:2];   // scaling to 32x64
+    
+    assign char_addr_s1 = {3'b011, sec_1s};
+    assign row_addr_s1 = y[5:2];   // scaling to 32x64
+    assign bit_addr_s1 = x[4:2];   // scaling to 32x64
+    
+    // Instantiate digit rom
+    clock_digit_rom cdr(.clk(clk), .addr(rom_addr), .data(digit_word));
+    
+    // Hour sections assert signals
+    assign H10_on = (H10_X_L <= x) && (x <= H10_X_R) &&
+                    (H10_Y_T <= y) && (y <= H10_Y_B) && (hr_10s != 0); // turn off digit if hours 10s = 1-9
+    assign H1_on =  (H1_X_L <= x) && (x <= H1_X_R) &&
+                    (H1_Y_T <= y) && (y <= H1_Y_B);
+    
+    // Colon 1 ROM assert signals
+    assign C1_on = (C1_X_L <= x) && (x <= C1_X_R) &&
+                   (C1_Y_T <= y) && (y <= C1_Y_B);
+                               
+    // Minute sections assert signals
+    assign M10_on = (M10_X_L <= x) && (x <= M10_X_R) &&
+                    (M10_Y_T <= y) && (y <= M10_Y_B);
+    assign M1_on =  (M1_X_L <= x) && (x <= M1_X_R) &&
+                    (M1_Y_T <= y) && (y <= M1_Y_B);                             
+    
+    // Colon 2 ROM assert signals
+    assign C2_on = (C2_X_L <= x) && (x <= C2_X_R) &&
+                   (C2_Y_T <= y) && (y <= C2_Y_B);
+                  
+    // Second sections assert signals
+    assign S10_on = (S10_X_L <= x) && (x <= S10_X_R) &&
+                    (S10_Y_T <= y) && (y <= S10_Y_B);
+    assign S1_on =  (S1_X_L <= x) && (x <= S1_X_R) &&
+                    (S1_Y_T <= y) && (y <= S1_Y_B);
+                          
+        
+    // Mux for ROM Addresses and RGB    
+    always @* begin
+        time_rgb = 12'h222;             // black background
+        if(H10_on) begin
+            char_addr = char_addr_h10;
+            row_addr = row_addr_h10;
+            bit_addr = bit_addr_h10;
+            if(digit_bit)
+                time_rgb = 12'hF00;     // red
+        end
+        else if(H1_on) begin
+            char_addr = char_addr_h1;
+            row_addr = row_addr_h1;
+            bit_addr = bit_addr_h1;
+            if(digit_bit)
+                time_rgb = 12'hF00;     // red
+        end
+        else if(C1_on) begin
+            char_addr = char_addr_c1;
+            row_addr = row_addr_c1;
+            bit_addr = bit_addr_c1;
+            if(digit_bit)
+                time_rgb = 12'hF00;     // red
+        end
+        else if(M10_on) begin
+            char_addr = char_addr_m10;
+            row_addr = row_addr_m10;
+            bit_addr = bit_addr_m10;
+            if(digit_bit)
+                time_rgb = 12'hF00;     // red
+        end
+        else if(M1_on) begin
+            char_addr = char_addr_m1;
+            row_addr = row_addr_m1;
+            bit_addr = bit_addr_m1;
+            if(digit_bit)
+                time_rgb = 12'hF00;     // red
+        end
+        else if(C2_on) begin
+            char_addr = char_addr_c2;
+            row_addr = row_addr_c2;
+            bit_addr = bit_addr_c2;
+            if(digit_bit)
+                time_rgb = 12'hF00;     // red
+        end
+        else if(S10_on) begin
+            char_addr = char_addr_s10;
+            row_addr = row_addr_s10;
+            bit_addr = bit_addr_s10;
+            if(digit_bit)
+                time_rgb = 12'hF00;     // red
+        end
+        else if(S1_on) begin
+            char_addr = char_addr_s1;
+            row_addr = row_addr_s1;
+            bit_addr = bit_addr_s1;
+            if(digit_bit)
+                time_rgb = 12'hF00;     // red
+        end  
+    end    
+    
+    // ROM Interface    
+    assign rom_addr = {char_addr, row_addr};
+    assign digit_bit = digit_word[~bit_addr];    
+                          
+endmodule
+
+/////////////////////////////////////////////////////////////////////////////
+
+
+module vga_controller(
+    input clk_100MHz,   // from Basys 3
+    input reset,        // system reset
+    output video_on,    // ON while pixel counts for x and y and within display area
+    output hsync,       // horizontal sync
+    output vsync,       // vertical sync
+    output p_tick,      // the 25MHz pixel/second rate signal, pixel tick
+    output [9:0] x,     // pixel count/position of pixel x, max 0-799
+    output [9:0] y      // pixel count/position of pixel y, max 0-524
+    );
+    
+    // Based on VGA standards found at vesa.org for 640x480 resolution
+    // Total horizontal width of screen = 800 pixels, partitioned  into sections
+    parameter HD = 640;             // horizontal display area width in pixels
+    parameter HF = 48;              // horizontal front porch width in pixels
+    parameter HB = 16;              // horizontal back porch width in pixels
+    parameter HR = 96;              // horizontal retrace width in pixels
+    parameter HMAX = HD+HF+HB+HR-1; // max value of horizontal counter = 799
+    // Total vertical length of screen = 525 pixels, partitioned into sections
+    parameter VD = 480;             // vertical display area length in pixels 
+    parameter VF = 10;              // vertical front porch length in pixels  
+    parameter VB = 33;              // vertical back porch length in pixels   
+    parameter VR = 2;               // vertical retrace length in pixels  
+    parameter VMAX = VD+VF+VB+VR-1; // max value of vertical counter = 524   
+    
+    // *** Generate 25MHz from 100MHz *********************************************************
+	reg  [1:0] r_25MHz;
+	wire w_25MHz;
+	
+	always @(posedge clk_100MHz or posedge reset)
+		if(reset)
+		  r_25MHz <= 0;
+		else
+		  r_25MHz <= r_25MHz + 1;
+	
+	assign w_25MHz = (r_25MHz == 0) ? 1 : 0; // assert tick 1/4 of the time
+    // ****************************************************************************************
+    
+    // Counter Registers, two each for buffering to avoid glitches
+    reg [9:0] h_count_reg, h_count_next;
+    reg [9:0] v_count_reg, v_count_next;
+    
+    // Output Buffers
+    reg v_sync_reg, h_sync_reg;
+    wire v_sync_next, h_sync_next;
+    
+    // Register Control
+    always @(posedge clk_100MHz or posedge reset)
+        if(reset) begin
+            v_count_reg <= 0;
+            h_count_reg <= 0;
+            v_sync_reg  <= 1'b0;
+            h_sync_reg  <= 1'b0;
+        end
+        else begin
+            v_count_reg <= v_count_next;
+            h_count_reg <= h_count_next;
+            v_sync_reg  <= v_sync_next;
+            h_sync_reg  <= h_sync_next;
+        end
+         
+    //Logic for horizontal counter
+    always @(posedge w_25MHz or posedge reset)      // pixel tick
+        if(reset)
+            h_count_next = 0;
+        else
+            if(h_count_reg == HMAX)                 // end of horizontal scan
+                h_count_next = 0;
+            else
+                h_count_next = h_count_reg + 1;         
+  
+    // Logic for vertical counter
+    always @(posedge w_25MHz or posedge reset)
+        if(reset)
+            v_count_next = 0;
+        else
+            if(h_count_reg == HMAX)                 // end of horizontal scan
+                if((v_count_reg == VMAX))           // end of vertical scan
+                    v_count_next = 0;
+                else
+                    v_count_next = v_count_reg + 1;
+        
+    // h_sync_next asserted within the horizontal retrace area
+    assign h_sync_next = (h_count_reg >= (HD+HB) && h_count_reg <= (HD+HB+HR-1));
+    
+    // v_sync_next asserted within the vertical retrace area
+    assign v_sync_next = (v_count_reg >= (VD+VB) && v_count_reg <= (VD+VB+VR-1));
+    
+    // Video ON/OFF - only ON while pixel counts are within the display area
+    assign video_on = (h_count_reg < HD) && (v_count_reg < VD); // 0-639 and 0-479 respectively
+            
+    // Outputs
+    assign hsync  = h_sync_reg;
+    assign vsync  = v_sync_reg;
+    assign x      = h_count_reg;
+    assign y      = v_count_reg;
+    assign p_tick = w_25MHz;
+            
+endmodule
+////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+# Clock signal
+set_property PACKAGE_PIN W5 [get_ports clk_100MHz]							
+	set_property IOSTANDARD LVCMOS33 [get_ports clk_100MHz]
+	create_clock -add -name sys_clk_pin -period 10.00 -waveform {0 5} [get_ports clk_100MHz]
+	
+##Buttons
+## btnc
+set_property PACKAGE_PIN U18 	 [get_ports reset]						
+set_property IOSTANDARD LVCMOS33 [get_ports reset]
+## btnL
+set_property PACKAGE_PIN W19 	 [get_ports tick_hr]						
+set_property IOSTANDARD LVCMOS33 [get_ports tick_hr]
+## btnR
+set_property PACKAGE_PIN T17 	 [get_ports tick_min]						
+set_property IOSTANDARD LVCMOS33 [get_ports tick_min]
+
+##VGA Connector
+set_property PACKAGE_PIN N19     [get_ports {rgb[11]}]				
+set_property IOSTANDARD LVCMOS33 [get_ports {rgb[11]}]
+set_property PACKAGE_PIN J19     [get_ports {rgb[10]}]				
+set_property IOSTANDARD LVCMOS33 [get_ports {rgb[10]}]
+set_property PACKAGE_PIN H19     [get_ports {rgb[9]}]				
+set_property IOSTANDARD LVCMOS33 [get_ports {rgb[9]}]
+set_property PACKAGE_PIN G19     [get_ports {rgb[8]}]				
+set_property IOSTANDARD LVCMOS33 [get_ports {rgb[8]}]
+set_property PACKAGE_PIN D17     [get_ports {rgb[7]}]				
+set_property IOSTANDARD LVCMOS33 [get_ports {rgb[7]}]
+set_property PACKAGE_PIN G17     [get_ports {rgb[6]}]				
+set_property IOSTANDARD LVCMOS33 [get_ports {rgb[6]}]
+set_property PACKAGE_PIN H17     [get_ports {rgb[5]}]				
+set_property IOSTANDARD LVCMOS33 [get_ports {rgb[5]}]
+set_property PACKAGE_PIN J17     [get_ports {rgb[4]}]				
+set_property IOSTANDARD LVCMOS33 [get_ports {rgb[4]}]
+set_property PACKAGE_PIN J18     [get_ports {rgb[3]}]				
+set_property IOSTANDARD LVCMOS33 [get_ports {rgb[3]}]
+set_property PACKAGE_PIN K18     [get_ports {rgb[2]}]				
+set_property IOSTANDARD LVCMOS33 [get_ports {rgb[2]}]
+set_property PACKAGE_PIN L18     [get_ports {rgb[1]}]				
+set_property IOSTANDARD LVCMOS33 [get_ports {rgb[1]}]
+set_property PACKAGE_PIN N18     [get_ports {rgb[0]}]				
+set_property IOSTANDARD LVCMOS33 [get_ports {rgb[0]}]
+set_property PACKAGE_PIN P19     [get_ports hsync]						
+set_property IOSTANDARD LVCMOS33 [get_ports hsync]
+set_property PACKAGE_PIN R19     [get_ports vsync]						
+set_property IOSTANDARD LVCMOS33 [get_ports vsync]
