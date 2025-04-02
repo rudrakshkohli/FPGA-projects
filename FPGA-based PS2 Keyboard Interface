@@ -1,1 +1,160 @@
+ 
+ module top(
+    input clk,
+    input rst,
+    input ps2_clk,
+    input ps2_data,
+    output [6:0] seg,    // ? Changed from "output reg" to "output"
+    output [3:0] anode   // ? Changed from "output reg" to "output"
+);
+
+    wire [3:0] key_code;  // ? 4-bit key output from PS/2 keyboard
+    wire flag;            // ? Flag to indicate new key received
+
+    // ? Instantiate Keyboard Module (with instance name `kb_inst`)
+    kb kb_inst (
+        .clk(clk),
+        .rst(rst),
+        .ps2_clk(ps2_clk),
+        .ps2_data(ps2_data),
+        .key_code(key_code),
+        .flag(flag)
+    );
+
+    // ? Instantiate SSD Module (with instance name `ssd_inst`)
+    ssd ssd_inst (
+        .clk(clk),
+        .key_code(key_code),
+        .seg(seg),
+        .anode(anode)
+/////////////////////////////////////////////////////////////////////////////
+
+
+
+module kb(
+    input clk,
+    input rst,
+    input ps2_clk,
+    input ps2_data,
+    output reg [3:0] key_code,
+    output reg flag
+);
+
+    reg [10:0] shift_reg;
+    reg [4:0] bit_count;
+    reg break_code;
+
+    always @(negedge ps2_clk or posedge rst) begin 
+        if (rst) begin
+            shift_reg  <= 11'b0;
+            bit_count  <= 0;
+            break_code <= 0;
+            flag       <= 0;
+        end 
+        else begin 
+            shift_reg <= {ps2_data, shift_reg[10:1]}; // Shift in new PS2 data
+            bit_count <= bit_count + 1;
+
+            if (bit_count == 10) begin
+                bit_count <= 0;
+
+                if (shift_reg[0] == 0 && shift_reg[10] == 1) begin
+                    if (shift_reg[8:1] == 8'hF0) begin
+                        break_code <= 1;  // Key release detected
+                    end 
+                    else if (!break_code) begin
+                        case (shift_reg[8:1])
+                            8'h45: key_code <= 4'd0;
+                            8'h16: key_code <= 4'd1;
+                            8'h1E: key_code <= 4'd2;
+                            8'h26: key_code <= 4'd3;
+                            8'h25: key_code <= 4'd4;
+                            8'h2E: key_code <= 4'd5;
+                            8'h36: key_code <= 4'd6;
+                            8'h3D: key_code <= 4'd7;
+                            8'h3E: key_code <= 4'd8;
+                            8'h46: key_code <= 4'd9;
+                            default: key_code <= 4'b1111;
+                        endcase
+                        flag <= 1'b1;
+                    end 
+                    else begin
+                        break_code <= 0;  // Reset break_code after release
+                    end
+                end
+            end
+        end
+    end
+endmodule
+
+///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+
+module ssd(
+input clk,
+input [3:0]key_code,
+output reg [6:0]seg,
+output reg [3:0]anode
+    );
+    reg [16:0]refresh_counter = 0;
+    always@(posedge clk)begin 
+    refresh_counter <= refresh_counter+1;
+    end
+    always@(*)begin 
+    case(refresh_counter[16:15]) 
+    2'b00: anode = 4'b1110; // Activate 1st digit (Others OFF)
+        2'b01: anode = 4'b1101; // Activate 2nd digit
+        2'b10: anode = 4'b1011; // Activate 3rd digit
+        2'b11: anode = 4'b0111; // Activate 4th digit
+    endcase
+    end
+    
+    always@(*)begin 
+    case(key_code)
+     4'h0: seg = 7'b1111110; // 0
+            4'h1: seg = 7'b0110000; // 1
+            4'h2: seg = 7'b1101101; // 2
+            4'h3: seg = 7'b1111001; // 3
+            4'h4: seg = 7'b0110011; // 4
+            4'h5: seg = 7'b1011011; // 5
+            4'h6: seg = 7'b1011111; // 6
+            4'h7: seg = 7'b1110000; // 7
+            4'h8: seg = 7'b1111111; // 8
+            4'h9: seg = 7'b1111011; // 9
+            default: seg = 7'b0000000; // Blank display
+    endcase
+    end
+endmodule
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+set_property IOSTANDARD LVCMOS33 [get_ports {anode[3]}]
+set_property IOSTANDARD LVCMOS33 [get_ports {anode[2]}]
+set_property IOSTANDARD LVCMOS33 [get_ports {anode[1]}]
+set_property IOSTANDARD LVCMOS33 [get_ports {anode[0]}]
+set_property IOSTANDARD LVCMOS33 [get_ports {seg[6]}]
+set_property IOSTANDARD LVCMOS33 [get_ports {seg[5]}]
+set_property IOSTANDARD LVCMOS33 [get_ports {seg[4]}]
+set_property IOSTANDARD LVCMOS33 [get_ports {seg[3]}]
+set_property IOSTANDARD LVCMOS33 [get_ports {seg[2]}]
+set_property IOSTANDARD LVCMOS33 [get_ports {seg[1]}]
+set_property IOSTANDARD LVCMOS33 [get_ports {seg[0]}]
+set_property IOSTANDARD LVCMOS33 [get_ports clk]
+set_property IOSTANDARD LVCMOS33 [get_ports ps2_clk]
+set_property IOSTANDARD LVCMOS33 [get_ports ps2_data]
+set_property IOSTANDARD LVCMOS33 [get_ports rst]
+set_property PACKAGE_PIN J14 [get_ports {anode[3]}]
+set_property PACKAGE_PIN T9 [get_ports {anode[2]}]
+set_property PACKAGE_PIN J18 [get_ports {anode[1]}]
+set_property PACKAGE_PIN J17 [get_ports {anode[0]}]
+set_property PACKAGE_PIN T10 [get_ports {seg[0]}]
+set_property PACKAGE_PIN R10 [get_ports {seg[1]}]
+set_property PACKAGE_PIN K16 [get_ports {seg[2]}]
+set_property PACKAGE_PIN K13 [get_ports {seg[3]}]
+set_property PACKAGE_PIN P15 [get_ports {seg[4]}]
+set_property PACKAGE_PIN T11 [get_ports {seg[5]}]
+set_property PACKAGE_PIN L18 [get_ports {seg[6]}]
+set_property PACKAGE_PIN E3 [get_ports clk]
+set_property PACKAGE_PIN F4 [get_ports ps2_clk]
+set_property PACKAGE_PIN B2 [get_ports ps2_data]
+set_property PACKAGE_PIN J15 [get_ports rst]
 
