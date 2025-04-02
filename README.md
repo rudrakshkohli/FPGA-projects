@@ -33,7 +33,7 @@ Designed a **VGA controller** capable of generating video signals, creating real
 Developed an **OLED display interface** on the Zybo FPGA board, enabling high-contrast graphical output and real-time data visualization.
 
 ### 8. SPI Temperature Sensor Interfacing on Zybo
-Implemented an **SPI-based MAX31855 temperature sensor** on the Zybo board, enabling real-time environmental monitoring and logging.
+Implemented an **SPI-based ADT7420 temperature sensor** on the Zybo board, enabling real-time environmental monitoring and logging.
 
 ### 9. I2C DAC on Zybo
 Designed an **FPGA-based I2C digital-to-analog converter (DAC)** to generate smooth analog signals from digital inputs, enhancing real-time signal processing applications.
