@@ -1,1 +1,128 @@
 
+
+#include "xparameters.h" /* SDK generated parameters */
+#include "xspips.h" /* SPI device driver */
+#include "xil_printf.h"
+/************************** Constant Definitions *****************************/
+/*
+* The following constant map to the XPAR parameters created in the
+* xparameters.h file. They are defined here such that a user can easily
+* change all the needed parameters in one place.
+*/
+#ifndef SDT
+#define SPI_DEVICE_ID XPAR_XSPIPS_0_DEVICE_ID
+#endif
+/**************************** Type Definitions *******************************/
+
+#ifndef SDT
+int SpiPsSlavePolledExample(u16 SpiDeviceId);
+#else
+int SpiPsSlavePolledExample(UINTPTR BaseAddress);
+#endif
+/************************** Variable Definitions *****************************/
+/*
+* The instances to support the device drivers are global such that they
+* are initialized to zero each time the program runs. They could be local
+* but should at least be static so they are zeroed.
+*
+*/
+static XSpiPs SpiInstance;
+//#define SPI_DEVICE_ID XPAR_SPI_0_DEVICE_ID // Change as per your configuration
+#define SPI_SELECT 0x00 // Slave Select line
+
+/*****************************************************************************/
+/**
+*
+* Main function to call the SPI Slave Example.
+*
+*
+* @return
+* - XST_SUCCESS if successful
+* - XST_FAILURE if not successful
+*
+* @note None
+*
+******************************************************************************/
+int main(void)
+{
+int Status;
+xil_printf("Running SpiPS Slave Polled Example \r\n");
+/*
+* Run the SpiPs Slave Polled example.
+*/
+#ifndef SDT
+Status = SpiPsSlavePolledExample(SPI_DEVICE_ID);
+#else
+Status = SpiPsSlavePolledExample(XPAR_XSPIPS_0_BASEADDR);
+#endif
+if (Status != XST_SUCCESS) {
+xil_printf("SpiPs Slave Polled Example Failed \r\n");
+return XST_FAILURE;
+}
+xil_printf("Successfully ran SpiPs Slave Polled Example \r\n");
+return XST_SUCCESS;
+}
+/*****************************************************************************/
+/**
+*
+
+* The purpose of this function is to illustrate how to use the XSpiPs
+* device driver in Slave mode. This function reads data from a SPI Master
+* and will echo it back to the Master.
+*
+* @param SpiDeviceId is the Instance Id of SPI in the system.
+*
+* @return
+* - XST_SUCCESS if successful
+* - XST_FAILURE if not successful
+*
+* @note None
+*
+*
+*****************************************************************************/
+#ifndef SDT
+int SpiPsSlavePolledExample(u16 SpiDeviceId)
+#else
+int SpiPsSlavePolledExample(UINTPTR BaseAddress)
+#endif
+{
+int Status;
+XSpiPs_Config *ConfigPtr;
+
+// Look up SPI configuration
+ConfigPtr = XSpiPs_LookupConfig(SPI_DEVICE_ID);
+if (ConfigPtr == NULL) {
+xil_printf("SPI config lookup failed\r\n");
+return XST_FAILURE;
+}
+// Initialize SPI driver instance
+Status = XSpiPs_CfgInitialize(&SpiInstance, ConfigPtr, ConfigPtr->BaseAddress);
+if (Status != XST_SUCCESS) {
+xil_printf("SPI initialization failed\r\n");
+return XST_FAILURE;
+}
+// Set SPI as master
+XSpiPs_SetOptions(&SpiInstance, XSPIPS_MASTER_OPTION |
+XSPIPS_CLK_ACTIVE_LOW_OPTION | XSPIPS_CLK_PHASE_1_OPTION);
+
+XSpiPs_Enable((&SpiInstance));
+
+// Set the SPI clock prescaler
+XSpiPs_SetClkPrescaler(&SpiInstance, XSPIPS_CLK_PRESCALE_16); // Adjust speed as
+//needed
+// Select the slave device
+XSpiPs_SetSlaveSelect(&SpiInstance, SPI_SELECT);
+// Enable SPI
+//XSpi_Start(&SpiInstance);
+//XSpi_IntrGlobalDisable(&SpiInstance);
+u8 txData[2] = {0x0f, 0xff};
+//u8 txData[2] = {0x00, 0x00};
+u8 rxData[4] = {0};
+s32 a;
+a = XSpiPs_Transfer(&SpiInstance,txData,NULL,2);
+xil_printf("d",a);
+
+xil_printf("SPI Initialized in Master Mode\r\n");
+return XST_SUCCESS;
+}
+
